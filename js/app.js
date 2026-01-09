@@ -1,5 +1,5 @@
-// MedPlatform - Aplicação com Firebase
-import { auth, db, storage } from './firebase-config.js';
+// MedPlatform - Aplicação com Firebase (SEM Storage - Base64)
+import { auth, db } from './firebase-config.js';
 import { 
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -16,24 +16,16 @@ import {
   orderBy,
   serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
-import { 
-  ref,
-  uploadBytes,
-  getDownloadURL
-} from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js';
 
 // Estado da aplicação
 let currentUser = null;
 let currentView = 'login';
 let articles = [];
-let videos = [];
 let users = [];
 
 // Formulários
 let loginForm = { email: '', password: '' };
-let registerForm = { name: '', email: '', password: '' };
-let articleForm = { title: '', content: '', imageFile: null, imageUrl: null };
-let videoForm = { title: '', description: '', videoFile: null, videoUrl: null };
+let articleForm = { title: '', content: '', imageBase64: null };
 
 // Função para renderizar a aplicação
 function render() {
@@ -48,7 +40,6 @@ function getCurrentView() {
   if (currentView === 'admin-dashboard') return getAdminDashboard();
   if (currentView === 'admin-users') return getAdminUsers();
   if (currentView === 'admin-create-article') return getCreateArticle();
-  if (currentView === 'admin-create-video') return getCreateVideo();
   if (currentView === 'user-dashboard') return getUserDashboard();
   return '';
 }
@@ -95,21 +86,10 @@ function getLoginView() {
           </button>
         </form>
 
-        <div class="mt-6 text-center">
-          <p class="text-gray-600 mb-3">Ainda não tem conta?</p>
-          <button
-            id="show-register"
-            class="text-teal-600 font-bold hover:text-teal-700"
-          >
-            📝 Criar Conta Gratuita
-          </button>
-        </div>
-
         <div class="mt-8 p-5 bg-gradient-to-r from-teal-50 to-cyan-50 rounded-2xl border-2 border-teal-200">
-          <p class="text-sm font-bold text-teal-800 mb-3">💡 Para testar como Admin:</p>
+          <p class="text-sm font-bold text-teal-800 mb-3">💡 Credenciais de teste:</p>
           <p class="text-sm text-gray-700 mb-1 font-mono">📧 admin@medplat.com</p>
           <p class="text-sm text-gray-700 font-mono">🔑 admin123</p>
-          <p class="text-xs text-gray-600 mt-3">* Crie sua conta para acessar como estudante</p>
         </div>
       </div>
     </div>
@@ -118,17 +98,13 @@ function getLoginView() {
 
 // VIEW: Admin Dashboard
 function getAdminDashboard() {
-  const recentContent = [...articles, ...videos]
-    .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
-    .slice(0, 5);
-
   return `
     <div class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       ${getHeader()}
       ${getAdminNav('dashboard')}
       
       <main class="max-w-7xl mx-auto px-6 py-10">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
           <div class="bg-white p-8 rounded-2xl shadow-lg border-l-8 border-teal-500">
             <div class="flex items-center justify-between">
               <div>
@@ -147,27 +123,18 @@ function getAdminDashboard() {
               <span class="text-6xl">📄</span>
             </div>
           </div>
-          <div class="bg-white p-8 rounded-2xl shadow-lg border-l-8 border-purple-500">
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="text-gray-600 text-sm font-bold uppercase">Vídeos</p>
-                <p class="text-5xl font-black text-purple-600 mt-2">${videos.length}</p>
-              </div>
-              <span class="text-6xl">🎬</span>
-            </div>
-          </div>
         </div>
 
         <div class="bg-white rounded-2xl shadow-lg p-8">
-          <h2 class="text-2xl font-black mb-6 text-gray-800">📋 Conteúdo Recente</h2>
-          ${recentContent.length === 0 ? `
-            <p class="text-gray-500 text-center py-12 text-lg font-semibold">Nenhum conteúdo publicado ainda</p>
+          <h2 class="text-2xl font-black mb-6 text-gray-800">📋 Artigos Recentes</h2>
+          ${articles.length === 0 ? `
+            <p class="text-gray-500 text-center py-12 text-lg font-semibold">Nenhum artigo publicado ainda</p>
           ` : `
             <div class="space-y-4">
-              ${recentContent.map(item => `
+              ${articles.map(item => `
                 <div class="flex items-center justify-between p-5 border-2 rounded-xl hover:shadow-md transition-all">
                   <div class="flex items-center gap-4">
-                    <span class="text-3xl">${item.videoUrl ? '🎥' : '📝'}</span>
+                    <span class="text-3xl">📝</span>
                     <div>
                       <p class="font-bold text-lg text-gray-800">${item.title}</p>
                       <p class="text-sm text-gray-600">${item.date || 'Recente'}</p>
@@ -176,7 +143,6 @@ function getAdminDashboard() {
                   <button
                     class="delete-content"
                     data-id="${item.id}"
-                    data-type="${item.videoUrl ? 'video' : 'article'}"
                   >
                     <span class="text-red-600 hover:text-red-800 text-2xl">🗑️</span>
                   </button>
@@ -298,7 +264,7 @@ function getCreateArticle() {
             </div>
 
             <div>
-              <label class="block text-sm font-bold text-gray-700 mb-2 uppercase">Imagem de Capa</label>
+              <label class="block text-sm font-bold text-gray-700 mb-2 uppercase">Imagem de Capa (opcional)</label>
               <div class="border-4 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-green-400 transition-all">
                 <input
                   type="file"
@@ -310,6 +276,7 @@ function getCreateArticle() {
                   <div id="article-image-preview">
                     <span class="text-6xl block mb-3">🖼️</span>
                     <p class="text-sm text-gray-600 font-semibold">Clique para selecionar uma imagem</p>
+                    <p class="text-xs text-gray-500 mt-2">Máximo 1MB recomendado</p>
                   </div>
                 </label>
               </div>
@@ -321,71 +288,6 @@ function getCreateArticle() {
               class="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-4 rounded-xl font-bold text-lg hover:from-green-600 hover:to-emerald-700 transition-all shadow-lg"
             >
               ✅ Publicar Artigo
-            </button>
-          </form>
-        </div>
-      </main>
-    </div>
-  `;
-}
-
-// VIEW: Create Video
-function getCreateVideo() {
-  return `
-    <div class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      ${getHeader()}
-      ${getAdminNav('video')}
-      
-      <main class="max-w-4xl mx-auto px-6 py-10">
-        <div class="bg-white rounded-2xl shadow-lg p-8 border-t-8 border-purple-500">
-          <h2 class="text-3xl font-black mb-8 text-gray-800">🎥 Publicar Novo Vídeo</h2>
-          <form id="create-video-form" class="space-y-6">
-            <div>
-              <label class="block text-sm font-bold text-gray-700 mb-2 uppercase">Título</label>
-              <input
-                type="text"
-                id="video-title"
-                class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-purple-200 focus:border-purple-500"
-                placeholder="Ex: Anatomia do Coração - Aula Completa"
-                required
-              />
-            </div>
-
-            <div>
-              <label class="block text-sm font-bold text-gray-700 mb-2 uppercase">Descrição</label>
-              <textarea
-                id="video-description"
-                class="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-purple-200 focus:border-purple-500 h-32"
-                placeholder="Descreva o conteúdo do vídeo..."
-                required
-              ></textarea>
-            </div>
-
-            <div>
-              <label class="block text-sm font-bold text-gray-700 mb-2 uppercase">Arquivo de Vídeo</label>
-              <div class="border-4 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-purple-400 transition-all">
-                <input
-                  type="file"
-                  accept="video/*"
-                  id="video-file"
-                  class="hidden"
-                />
-                <label for="video-file" class="cursor-pointer">
-                  <div id="video-file-preview">
-                    <span class="text-6xl block mb-3">🎬</span>
-                    <p class="text-sm text-gray-600 font-semibold">Clique para selecionar um vídeo</p>
-                    <p class="text-xs text-gray-500 mt-2">MP4, MOV, AVI</p>
-                  </div>
-                </label>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              id="submit-video"
-              class="w-full bg-gradient-to-r from-purple-500 to-pink-600 text-white py-4 rounded-xl font-bold text-lg hover:from-purple-600 hover:to-pink-700 transition-all shadow-lg"
-            >
-              ✅ Publicar Vídeo
             </button>
           </form>
         </div>
@@ -414,8 +316,8 @@ function getUserDashboard() {
             <div class="space-y-8">
               ${articles.map(article => `
                 <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
-                  ${article.imageUrl ? `
-                    <img src="${article.imageUrl}" alt="${article.title}" class="w-full h-64 object-cover" />
+                  ${article.imageBase64 ? `
+                    <img src="${article.imageBase64}" alt="${article.title}" class="w-full h-64 object-cover" />
                   ` : ''}
                   <div class="p-8">
                     <h4 class="text-2xl font-black mb-2 text-gray-800">${article.title}</h4>
@@ -430,40 +332,12 @@ function getUserDashboard() {
               `).join('')}
             </div>
           </div>
-        ` : ''}
-
-        ${videos.length > 0 ? `
-          <div class="mb-10">
-            <h3 class="text-2xl font-black mb-6 text-gray-800 flex items-center gap-3">
-              <span>🎥</span> Vídeos Recentes
-            </h3>
-            <div class="space-y-8">
-              ${videos.map(video => `
-                <div class="bg-white rounded-2xl shadow-lg overflow-hidden">
-                  ${video.videoUrl ? `
-                    <video src="${video.videoUrl}" controls class="w-full"></video>
-                  ` : ''}
-                  <div class="p-8">
-                    <h4 class="text-2xl font-black mb-2 text-gray-800">${video.title}</h4>
-                    <div class="flex items-center gap-4 text-sm text-gray-600 mb-4">
-                      <span>Por ${video.author}</span>
-                      <span>•</span>
-                      <span>${video.date}</span>
-                    </div>
-                    <p class="text-gray-700 leading-relaxed">${video.description}</p>
-                  </div>
-                </div>
-              `).join('')}
-            </div>
-          </div>
-        ` : ''}
-
-        ${articles.length === 0 && videos.length === 0 ? `
+        ` : `
           <div class="bg-white rounded-2xl shadow-lg p-16 text-center">
             <span class="text-8xl block mb-4">👀</span>
             <p class="text-gray-600 text-lg font-semibold">Nenhum conteúdo publicado ainda</p>
           </div>
-        ` : ''}
+        `}
       </main>
     </div>
   `;
@@ -497,8 +371,7 @@ function getAdminNav(active) {
   const navItems = [
     { id: 'dashboard', label: '📊 Painel', view: 'admin-dashboard' },
     { id: 'users', label: '👥 Usuários', view: 'admin-users' },
-    { id: 'article', label: '📝 Criar Artigo', view: 'admin-create-article' },
-    { id: 'video', label: '🎥 Vídeo', view: 'admin-create-video' }
+    { id: 'article', label: '📝 Criar Artigo', view: 'admin-create-article' }
   ];
 
   return `
@@ -525,27 +398,16 @@ function getAdminNav(active) {
 
 // Event Listeners
 function attachEventListeners() {
-  // Login form
   const loginForm = document.getElementById('login-form');
   if (loginForm) {
     loginForm.addEventListener('submit', handleLogin);
   }
 
-  // Show register
-  const showRegister = document.getElementById('show-register');
-  if (showRegister) {
-    showRegister.addEventListener('click', () => {
-      alert('Funcionalidade de registro em desenvolvimento! Por enquanto, use: admin@medplat.com / admin123');
-    });
-  }
-
-  // Logout
   const logoutBtn = document.getElementById('logout-btn');
   if (logoutBtn) {
     logoutBtn.addEventListener('click', handleLogout);
   }
 
-  // Navigation buttons
   document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       currentView = e.currentTarget.dataset.view;
@@ -553,13 +415,11 @@ function attachEventListeners() {
     });
   });
 
-  // Create user form
   const createUserForm = document.getElementById('create-user-form');
   if (createUserForm) {
     createUserForm.addEventListener('submit', handleCreateUser);
   }
 
-  // Create article form
   const createArticleForm = document.getElementById('create-article-form');
   if (createArticleForm) {
     createArticleForm.addEventListener('submit', handleCreateArticle);
@@ -570,27 +430,10 @@ function attachEventListeners() {
     }
   }
 
-  // Create video form
-  const createVideoForm = document.getElementById('create-video-form');
-  if (createVideoForm) {
-    createVideoForm.addEventListener('submit', handleCreateVideo);
-    
-    const videoInput = document.getElementById('video-file');
-    if (videoInput) {
-      videoInput.addEventListener('change', handleVideoFilePreview);
-    }
-  }
-
-  // Delete buttons
   document.querySelectorAll('.delete-content').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const id = e.currentTarget.dataset.id;
-      const type = e.currentTarget.dataset.type;
-      if (type === 'article') {
-        handleDeleteArticle(id);
-      } else {
-        handleDeleteVideo(id);
-      }
+      handleDeleteArticle(id);
     });
   });
 
@@ -609,8 +452,7 @@ async function handleLogin(e) {
   const password = document.getElementById('login-password').value;
 
   try {
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    // O onAuthStateChanged vai pegar o usuário logado
+    await signInWithEmailAndPassword(auth, email, password);
   } catch (error) {
     alert('Erro ao fazer login: ' + error.message);
   }
@@ -654,25 +496,17 @@ async function handleCreateArticle(e) {
   e.preventDefault();
   const title = document.getElementById('article-title').value;
   const content = document.getElementById('article-content').value;
-  const imageFile = articleForm.imageFile;
+  const imageBase64 = articleForm.imageBase64;
 
   const submitBtn = document.getElementById('submit-article');
   submitBtn.disabled = true;
   submitBtn.textContent = '⏳ Publicando...';
 
   try {
-    let imageUrl = null;
-    
-    if (imageFile) {
-      const imageRef = ref(storage, `articles/${Date.now()}_${imageFile.name}`);
-      await uploadBytes(imageRef, imageFile);
-      imageUrl = await getDownloadURL(imageRef);
-    }
-
     await addDoc(collection(db, 'articles'), {
       title,
       content,
-      imageUrl,
+      imageBase64: imageBase64 || null,
       author: currentUser.name,
       authorId: currentUser.uid,
       date: new Date().toLocaleDateString('pt-BR'),
@@ -680,83 +514,33 @@ async function handleCreateArticle(e) {
     });
 
     alert('Artigo publicado com sucesso!');
-    articleForm = { title: '', content: '', imageFile: null, imageUrl: null };
+    articleForm = { title: '', content: '', imageBase64: null };
     await loadArticles();
     currentView = 'admin-dashboard';
     render();
   } catch (error) {
     alert('Erro ao publicar artigo: ' + error.message);
+    console.error('Erro completo:', error);
     submitBtn.disabled = false;
     submitBtn.textContent = '✅ Publicar Artigo';
-  }
-}
-
-async function handleCreateVideo(e) {
-  e.preventDefault();
-  const title = document.getElementById('video-title').value;
-  const description = document.getElementById('video-description').value;
-  const videoFile = videoForm.videoFile;
-
-  const submitBtn = document.getElementById('submit-video');
-  submitBtn.disabled = true;
-  submitBtn.textContent = '⏳ Enviando vídeo...';
-
-  try {
-    let videoUrl = null;
-    
-    if (videoFile) {
-      const videoRef = ref(storage, `videos/${Date.now()}_${videoFile.name}`);
-      await uploadBytes(videoRef, videoFile);
-      videoUrl = await getDownloadURL(videoRef);
-    }
-
-    await addDoc(collection(db, 'videos'), {
-      title,
-      description,
-      videoUrl,
-      author: currentUser.name,
-      authorId: currentUser.uid,
-      date: new Date().toLocaleDateString('pt-BR'),
-      timestamp: serverTimestamp()
-    });
-
-    alert('Vídeo publicado com sucesso!');
-    videoForm = { title: '', description: '', videoFile: null, videoUrl: null };
-    await loadVideos();
-    currentView = 'admin-dashboard';
-    render();
-  } catch (error) {
-    alert('Erro ao publicar vídeo: ' + error.message);
-    submitBtn.disabled = false;
-    submitBtn.textContent = '✅ Publicar Vídeo';
   }
 }
 
 function handleArticleImagePreview(e) {
   const file = e.target.files[0];
   if (file) {
-    articleForm.imageFile = file;
+    if (file.size > 1048576) {
+      alert('Imagem muito grande! Use uma imagem menor que 1MB.');
+      return;
+    }
+    
     const reader = new FileReader();
     reader.onloadend = () => {
+      articleForm.imageBase64 = reader.result;
       const preview = document.getElementById('article-image-preview');
       preview.innerHTML = `<img src="${reader.result}" alt="Preview" class="max-h-64 mx-auto rounded-xl mb-4 shadow-lg" />`;
     };
     reader.readAsDataURL(file);
-  }
-}
-
-function handleVideoFilePreview(e) {
-  const file = e.target.files[0];
-  if (file) {
-    videoForm.videoFile = file;
-    const preview = document.getElementById('video-file-preview');
-    preview.innerHTML = `
-      <div class="text-green-600">
-        <span class="text-6xl block mb-3">✅</span>
-        <p class="text-sm font-semibold">${file.name}</p>
-        <p class="text-xs text-gray-500 mt-2">${(file.size / (1024 * 1024)).toFixed(2)} MB</p>
-      </div>
-    `;
   }
 }
 
@@ -769,18 +553,6 @@ async function handleDeleteArticle(id) {
     render();
   } catch (error) {
     alert('Erro ao excluir artigo: ' + error.message);
-  }
-}
-
-async function handleDeleteVideo(id) {
-  if (!confirm('Tem certeza que deseja excluir este vídeo?')) return;
-
-  try {
-    await deleteDoc(doc(db, 'videos', id));
-    await loadVideos();
-    render();
-  } catch (error) {
-    alert('Erro ao excluir vídeo: ' + error.message);
   }
 }
 
@@ -822,23 +594,9 @@ async function loadArticles() {
   }
 }
 
-async function loadVideos() {
-  try {
-    const q = query(collection(db, 'videos'), orderBy('timestamp', 'desc'));
-    const querySnapshot = await getDocs(q);
-    videos = [];
-    querySnapshot.forEach((doc) => {
-      videos.push({ id: doc.id, ...doc.data() });
-    });
-  } catch (error) {
-    console.error('Erro ao carregar vídeos:', error);
-  }
-}
-
 // AUTH STATE OBSERVER
 onAuthStateChanged(auth, async (user) => {
   if (user) {
-    // Usuário logado
     const usersSnapshot = await getDocs(collection(db, 'users'));
     let userData = null;
     
@@ -849,7 +607,6 @@ onAuthStateChanged(auth, async (user) => {
     });
 
     if (!userData) {
-      // Criar usuário no Firestore se não existir
       const docRef = await addDoc(collection(db, 'users'), {
         uid: user.uid,
         email: user.email,
@@ -867,21 +624,14 @@ onAuthStateChanged(auth, async (user) => {
     }
 
     currentUser = userData;
-    
-    // Carregar dados
-    await Promise.all([loadUsers(), loadArticles(), loadVideos()]);
-    
-    // Definir view baseada no role
+    await Promise.all([loadUsers(), loadArticles()]);
     currentView = userData.role === 'admin' ? 'admin-dashboard' : 'user-dashboard';
     render();
   } else {
-    // Usuário não logado
     currentUser = null;
     currentView = 'login';
     render();
   }
 });
 
-// Initial render
 render();
-
