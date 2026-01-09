@@ -8,18 +8,24 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- React -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Firebase v9+ -->
+    <script type="module" src="js/firebase-config.js"></script>
+    <script type="module" src="js/app.js"></script>
     
     <!-- CSS customizado -->
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-    <div id="root"></div>
-    
-    <!-- JavaScript da aplicação -->
-    <script type="text/babel" src="js/app.js"></script>
+    <div id="root">
+        <!-- Loading inicial -->
+        <div class="min-h-screen bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-100 flex items-center justify-center">
+            <div class="text-center">
+                <div class="inline-block p-3 bg-teal-100 rounded-full mb-4 animate-pulse">
+                    <span class="text-6xl">🏥</span>
+                </div>
+                <h1 class="text-3xl font-black text-gray-800">Carregando MedPlatform...</h1>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
