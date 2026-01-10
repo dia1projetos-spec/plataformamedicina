@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>MedFocus - Plataforma Educacional para Medicina</title>
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="images/logo.png">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- Firebase v9+ -->
+    <script type="module" src="js/firebase-config.js"></script>
+    <script type="module" src="js/app.js"></script>
+    
+    <!-- CSS customizado -->
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div id="root">
+        <!-- Loading inicial -->
+        <div class="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
+            <div class="text-center">
+                <div class="inline-block p-4 bg-white rounded-2xl mb-6 shadow-2xl animate-pulse">
+                    <img src="images/logo.png" alt="MedFocus" class="w-32 h-32 object-contain">
+                </div>
+                <h1 class="text-4xl font-black text-gray-900 mb-2">MedFocus</h1>
+                <p class="text-gray-600">Carregando...</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
